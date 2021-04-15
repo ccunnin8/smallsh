@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <signal.h>
 
 #define MAX_LENGTH 2048
 
@@ -21,11 +22,14 @@ struct argument {
     struct argument *nextargument;
 };
 
-struct command parseInput(char *input) {
+struct command parseInput(char *userInput) {
     struct command cmd= { NULL, NULL, NULL, NULL, false };
     struct argument arg = { NULL, NULL };
     struct argument *argPtr = &arg; 
 
+    // copy input w length - 1 to get rid of \n
+    char input[strlen(userInput) - 1];
+    strncpy(input, userInput, strlen(userInput) - 1);
     // store arguments to parse 
     char arguments[MAX_LENGTH] = { 0 };
     int argumentCount = 1;
@@ -48,7 +52,7 @@ struct command parseInput(char *input) {
                 // process stdout redirect 
                 char *fileName = strtok_r(NULL, " ", &saveptr);
                 cmd.outputFile = fileName;
-            } else if (strcmp("&\n", token) == 0){
+            } else if (strcmp("&", token) == 0){
                 // process run in background 
                 printf("ampersand!");
                 cmd.background = true;
@@ -77,7 +81,7 @@ void expandInput(char input[], char newInput[]) {
     // source: https://stackoverflow.com/questions/53230155/converting-pid-t-to-string
     // allocate enough memory for pid and cast to char *
     // use sprintf to write pid value into pidStr 
-    
+
     char *pidStr = (char *)(malloc(sizeof(pid_t)));
     sprintf(pidStr, "%d", pid);
 
@@ -109,6 +113,27 @@ void expandInput(char input[], char newInput[]) {
     }
 }
 
+void processInput(struct command input) {
+    // looks at the command in the struct given and executes 
+    // built in function OR uses exec to execute non built in 
+    if (strcmp(input.command, "exit") == 0) {
+        // exit 
+
+        // get group process id and kill all children 
+        pid_t pgid = getgid();
+        kill(pgid, 0);
+
+        // exit program 
+        exit(0);
+    } else if (strcmp(input.command, "cd") == 0) {
+        // change directory 
+    } else if (strcmp(input.command, "status") == 0) {
+        // get status  
+    } else {
+        // use exec family 
+    }
+}
+
 int main(void) {
     while (1) {
         char userInput[MAX_LENGTH];
@@ -120,7 +145,8 @@ int main(void) {
             char expandedInput[MAX_LENGTH];
             expandInput(userInput, expandedInput);
             printf("%s", expandedInput);
-            // struct command input = parseInput(userInput);
+            struct command input = parseInput(userInput);
+            processInput(input);
             // struct argument *args = input.arguments;
             fflush(stdin);
             fflush(stdout);   
