@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #define MAX_LENGTH 2048
 
@@ -68,22 +69,55 @@ struct command parseInput(char *input) {
     return cmd;
 }
 
+void expandInput(char input[], char newInput[]) {
+    pid_t pid = getpid();
+
+    char pidStr[4] = "123\0";
+
+    bool firstSymbol = false;
+    
+    // loop through old input look for $
+    for (int i = 0; i < strlen(input); i++) {
+        // found $
+        if (input[i] == '$') {
+            // check if second $ and if so expand 
+            if (firstSymbol) {
+                strcat(newInput, pidStr);
+                firstSymbol = false;
+            // first $
+            } else {
+                firstSymbol = true;
+            }
+        // not a $
+        } else {
+            // reset search param for $
+            if (firstSymbol) {
+                firstSymbol = false;
+                strcat(newInput, "$");
+            }
+            // add input to newinput 
+            char toCat[2] = { input[i], '\0' };
+            strcat(newInput, toCat);
+        }
+    }
+}
+
 int main(void) {
     while (1) {
         char userInput[MAX_LENGTH];
         printf(": ");
         fgets(userInput, MAX_LENGTH, stdin);
 
-        struct command input = parseInput(userInput);
-        
-        printf("Command: %s\n", input.command);
-        struct argument *args = input.arguments;
-        while (args != NULL) {
-            printf("argument: %s\n", args->argument);
-            args = args->nextargument;
+        // if comment or blank line ignore all input
+        if (userInput[0] != '#' && strcmp(userInput,"\n") != 0) {
+            char expandedInput[MAX_LENGTH];
+            expandInput(userInput, expandedInput);
+            printf("%s", expandedInput);
+            // struct command input = parseInput(userInput);
+            // struct argument *args = input.arguments;
+            fflush(stdin);
+            fflush(stdout);   
         }
-        fflush(stdin);
-        fflush(stdout);
     }
     return 0;
 }
