@@ -70,9 +70,16 @@ struct command parseInput(char *input) {
 }
 
 void expandInput(char input[], char newInput[]) {
+    // expands instances of $$ to be pid 
+
     pid_t pid = getpid();
 
-    char pidStr[4] = "123\0";
+    // source: https://stackoverflow.com/questions/53230155/converting-pid-t-to-string
+    // allocate enough memory for pid and cast to char *
+    // use sprintf to write pid value into pidStr 
+    
+    char *pidStr = (char *)(malloc(sizeof(pid_t)));
+    sprintf(pidStr, "%d", pid);
 
     bool firstSymbol = false;
     
