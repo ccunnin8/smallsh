@@ -10,8 +10,8 @@
 struct command {
     char *command;
     struct argument *arguments;
-    int inputFile;
-    int outputFile;
+    char *inputFile;
+    char *outputFile;
     bool background;
 };
 
@@ -21,7 +21,7 @@ struct argument {
 };
 
 struct command parseInput(char *input) {
-    struct command cmd= { NULL, NULL, 0, 1, false };
+    struct command cmd= { NULL, NULL, NULL, NULL, false };
     struct argument arg = { NULL, NULL };
     struct argument *argPtr = &arg; 
 
@@ -42,15 +42,14 @@ struct command parseInput(char *input) {
             if (strcmp("<", token) == 0) {
                 // process stdin redirect 
                 char *fileName = strtok_r(NULL, " ", &saveptr);
-                int fd = open(fileName, O_RDONLY);
-                cmd.inputFile = fd;
+                cmd.inputFile = fileName;
             } else if (strcmp(">", token) == 0) {
                 // process stdout redirect 
                 char *fileName = strtok_r(NULL, " ", &saveptr);
-                int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-                cmd.outputFile = fd;
-            } else if (strcmp("&", token) == 0) {
+                cmd.outputFile = fileName;
+            } else if (strcmp("&\n", token) == 0){
                 // process run in background 
+                printf("ampersand!");
                 cmd.background = true;
             } else {
                 // process argument 
