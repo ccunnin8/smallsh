@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define MAX_LENGTH
+#define MAX_LENGTH 2048
 
 struct command {
     char *command;
@@ -15,13 +17,13 @@ struct command {
 
 struct argument {
     char *argument;
-    struct argument *nextArgument;
+    struct argument *nextargument;
 };
 
 struct command parseInput(char *input) {
-    struct command cmd= { NULL, NULL, 0, 0, false };
-    struct argument oldArg = { NULL, NULL };
-    struct argument *firstArg = &oldArg; 
+    struct command cmd= { NULL, NULL, 0, 1, false };
+    struct argument arg = { NULL, NULL };
+    struct argument *argPtr = &arg; 
 
     // store arguments to parse 
     char arguments[MAX_LENGTH] = { 0 };
@@ -34,28 +36,55 @@ struct command parseInput(char *input) {
 
     while (token = strtok_r(NULL, " ", &saveptr)) {
         if (argumentCount == 1) {
-            oldArg.argument = token;
-        } else {
-            struct argument newArg = { token, NULL };
-            oldArg.nextArgument = &newArg;
-            oldArg = newArg;
+            arg.argument = token;
             argumentCount++;
+        } else {
+            if (strcmp("<", token) == 0) {
+                // process stdin redirect 
+                char *fileName = strtok_r(NULL, " ", &saveptr);
+                int fd = open(fileName, O_RDONLY);
+                cmd.inputFile = fd;
+            } else if (strcmp(">", token) == 0) {
+                // process stdout redirect 
+                char *fileName = strtok_r(NULL, " ", &saveptr);
+                int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+                cmd.outputFile = fd;
+            } else if (strcmp("&", token) == 0) {
+                // process run in background 
+                cmd.background = true;
+            } else {
+                // process argument 
+                struct argument *newarg = malloc(sizeof(struct argument));
+                newarg->argument = token;
+                newarg->nextargument = NULL; 
+
+                argPtr->nextargument = newarg;
+                argPtr = newarg;
+                argumentCount++;
+            }
         }
     }
-    cmd.arguments = firstArg; 
+    cmd.arguments = &arg; 
 
     return cmd;
 }
 
 int main(void) {
     while (1) {
-        char userInput[MAX_LENGTH] = { 0 };
+        char userInput[MAX_LENGTH];
         printf(": ");
-        scanf("%s", userInput);
-        printf("%s", userInput);
-        // struct command input = parseInput(userInput);
-        // printf("Command: %s\n", input.command);
-        // fflush(stdout);
+        fgets(userInput, MAX_LENGTH, stdin);
+
+        struct command input = parseInput(userInput);
+        
+        printf("Command: %s\n", input.command);
+        struct argument *args = input.arguments;
+        while (args != NULL) {
+            printf("argument: %s\n", args->argument);
+            args = args->nextargument;
+        }
+        fflush(stdin);
+        fflush(stdout);
     }
     return 0;
 }
