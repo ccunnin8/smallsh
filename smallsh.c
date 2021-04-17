@@ -24,6 +24,16 @@ struct argument {
     struct argument *nextargument;
 };
 
+void checkInputEnding(char userInput[]) {
+    // removes a space or new line character from 
+
+    int len = strlen(userInput) - 1;
+    while (userInput[len] == ' ' || userInput[len] == '\n') {
+        userInput[len] = '\0';
+        len--;
+    }
+}
+
 struct command *parseInput(char *userInput) {
     struct command *cmd = malloc(sizeof(struct command));
     cmd->command = NULL;
@@ -38,17 +48,17 @@ struct command *parseInput(char *userInput) {
     arg->nextargument = NULL;
     struct argument *argPtr = arg; 
 
-    // copy input w length - 1 to get rid of \n
-    char *input = calloc(strlen(userInput) - 1, (strlen(userInput) - 1) * sizeof(char));
-
-    strncpy(input, userInput, strlen(userInput) - 1);
     // store arguments to parse 
     char arguments[MAX_LENGTH] = { 0 };
     int argumentCount = 1;
 
-    // get first 
+    // remove new line from userInput 
+    checkInputEnding(userInput);
+
+    // get first argument passed to scanf
     char *saveptr;
-    char *token = strtok_r(input, " ", &saveptr);
+    char *token = strtok_r(userInput, " ", &saveptr);
+    
     cmd->command = token;
 
     while (token = strtok_r(NULL, " ", &saveptr)) {
@@ -144,7 +154,7 @@ void processInput(struct command *input) {
         // change directory 
         
         // if no argument PWD = HOME  
-        if (input->arguments->argument == NULL) {
+        if (input->arguments == NULL) {
             char *home = getenv("HOME");
             int changePath = chdir(home);
             if (changePath == -1) {
@@ -207,15 +217,15 @@ void processInput(struct command *input) {
 
 int main(void) {
     while (1) {
+        fflush(stdin);
+        fflush(stdout);  
         char userInput[MAX_LENGTH];
         printf(": ");
         fgets(userInput, MAX_LENGTH, stdin);
-        fflush(stdin);
-        fflush(stdout);  
         // if comment or blank line ignore all input
         if (userInput[0] != '#' && strcmp(userInput,"\n") != 0) {
             char expandedInput[MAX_LENGTH];
-            expandInput(userInput, expandedInput);
+            //expandInput(userInput, expandedInput);
             struct command *input = parseInput(userInput);
             processInput(input);
             // struct argument *args = input.arguments;
