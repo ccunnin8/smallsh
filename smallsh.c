@@ -39,7 +39,8 @@ struct command *parseInput(char *userInput) {
     struct argument *argPtr = arg; 
 
     // copy input w length - 1 to get rid of \n
-    char input[strlen(userInput) - 1];
+    char *input = calloc(strlen(userInput) - 1, (strlen(userInput) - 1) * sizeof(char));
+
     strncpy(input, userInput, strlen(userInput) - 1);
     // store arguments to parse 
     char arguments[MAX_LENGTH] = { 0 };
@@ -79,9 +80,11 @@ struct command *parseInput(char *userInput) {
             }
         }
     }
-    // add number of arguments to the command struct
-    cmd->numArguments = argumentCount;
-    cmd->arguments = arg; 
+    // add number of arguments to the command struct if there are arguments 
+    if (arg->argument != NULL) {
+        cmd->numArguments = argumentCount;
+        cmd->arguments = arg; 
+    }
 
     return cmd;
 }
@@ -174,11 +177,10 @@ void processInput(struct command *input) {
                 break;
             case 0:
                 // use exec family 
-                printf("INPUT COMMAND: %s\n", input->command);
                 args[0] = input->command;
                 struct argument *curr = input->arguments;
                 int counter = 1;
-                 
+
                 while (curr != NULL) {
                     args[counter] = curr->argument;
                     printf("arg: %s", curr->argument);
@@ -186,7 +188,7 @@ void processInput(struct command *input) {
                     curr = curr->nextargument;
                 }
 
-                args[counter + 1] = NULL;
+                args[counter] = NULL;
                 
                 int status = execvp(args[0], args);
 
@@ -214,7 +216,6 @@ int main(void) {
         if (userInput[0] != '#' && strcmp(userInput,"\n") != 0) {
             char expandedInput[MAX_LENGTH];
             expandInput(userInput, expandedInput);
-            // printf("expanded: %s", expandedInput);
             struct command *input = parseInput(userInput);
             processInput(input);
             // struct argument *args = input.arguments;
