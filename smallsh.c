@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/wait.h>
 
 #define MAX_LENGTH 2048
 
@@ -15,6 +16,7 @@ struct command {
     char *inputFile;
     char *outputFile;
     bool background;
+    int numArguments;
 };
 
 struct argument {
@@ -22,10 +24,19 @@ struct argument {
     struct argument *nextargument;
 };
 
-struct command parseInput(char *userInput) {
-    struct command cmd= { NULL, NULL, NULL, NULL, false };
-    struct argument arg = { NULL, NULL };
-    struct argument *argPtr = &arg; 
+struct command *parseInput(char *userInput) {
+    struct command *cmd = malloc(sizeof(struct command));
+    cmd->command = NULL;
+    cmd->arguments = NULL;
+    cmd->inputFile = NULL;
+    cmd->outputFile = NULL;
+    cmd->background = false;
+    cmd->numArguments = 0;
+
+    struct argument *arg = malloc(sizeof(struct argument));
+    arg->argument = NULL;
+    arg->nextargument = NULL;
+    struct argument *argPtr = arg; 
 
     // copy input w length - 1 to get rid of \n
     char input[strlen(userInput) - 1];
@@ -37,25 +48,25 @@ struct command parseInput(char *userInput) {
     // get first 
     char *saveptr;
     char *token = strtok_r(input, " ", &saveptr);
-    cmd.command = token;
+    cmd->command = token;
 
     while (token = strtok_r(NULL, " ", &saveptr)) {
         if (argumentCount == 1) {
-            arg.argument = token;
+            arg->argument = token;
             argumentCount++;
         } else {
             if (strcmp("<", token) == 0) {
                 // process stdin redirect 
                 char *fileName = strtok_r(NULL, " ", &saveptr);
-                cmd.inputFile = fileName;
+                cmd->inputFile = fileName;
             } else if (strcmp(">", token) == 0) {
                 // process stdout redirect 
                 char *fileName = strtok_r(NULL, " ", &saveptr);
-                cmd.outputFile = fileName;
+                cmd->outputFile = fileName;
             } else if (strcmp("&", token) == 0){
                 // process run in background 
                 printf("ampersand!");
-                cmd.background = true;
+                cmd->background = true;
             } else {
                 // process argument 
                 struct argument *newarg = malloc(sizeof(struct argument));
@@ -68,7 +79,9 @@ struct command parseInput(char *userInput) {
             }
         }
     }
-    cmd.arguments = &arg; 
+    // add number of arguments to the command struct
+    cmd->numArguments = argumentCount;
+    cmd->arguments = arg; 
 
     return cmd;
 }
@@ -113,24 +126,80 @@ void expandInput(char input[], char newInput[]) {
     }
 }
 
-void processInput(struct command input) {
+void processInput(struct command *input) {
     // looks at the command in the struct given and executes 
     // built in function OR uses exec to execute non built in 
-    if (strcmp(input.command, "exit") == 0) {
+    if (strcmp(input->command, "exit") == 0) {
         // exit 
-
         // get group process id and kill all children 
         pid_t pgid = getgid();
         kill(pgid, 0);
 
         // exit program 
         exit(0);
-    } else if (strcmp(input.command, "cd") == 0) {
+    } else if (strcmp(input->command, "cd") == 0) {
         // change directory 
-    } else if (strcmp(input.command, "status") == 0) {
+        
+        // if no argument PWD = HOME  
+        if (input->arguments->argument == NULL) {
+            char *home = getenv("HOME");
+            int changePath = chdir(home);
+            if (changePath == -1) {
+                perror("An error occurred changing paths");
+            }
+        // change PWD to argument given
+        } else {
+            // check if directory exists?
+            char *newPath = input->arguments->argument;
+            int changePath = chdir(newPath);
+            if (changePath == -1) {
+                perror("Unable to change to that directory");
+            }
+        }
+
+    } else if (strcmp(input->command, "status") == 0) {
         // get status  
+        printf("Will print status\n");
     } else {
-        // use exec family 
+        // for a new process 
+        // adpated from exploration: process api: executing a new program 
+        pid_t spawnPid = fork();
+        int childStatus;
+        char *args[input->numArguments + 1];
+
+        switch (spawnPid) {
+            case -1:
+                perror("fork error\n");
+                exit(1);
+                break;
+            case 0:
+                // use exec family 
+                printf("INPUT COMMAND: %s\n", input->command);
+                args[0] = input->command;
+                struct argument *curr = input->arguments;
+                int counter = 1;
+                 
+                while (curr != NULL) {
+                    args[counter] = curr->argument;
+                    printf("arg: %s", curr->argument);
+                    counter++;
+                    curr = curr->nextargument;
+                }
+
+                args[counter + 1] = NULL;
+                
+                int status = execvp(args[0], args);
+
+                if (status == -1) {
+                    perror("A problem occurred executing\n");
+                }
+                exit(0);
+                break;
+            default:
+                spawnPid = waitpid(spawnPid, &childStatus, 0);
+
+
+        }
     }
 }
 
@@ -139,13 +208,14 @@ int main(void) {
         char userInput[MAX_LENGTH];
         printf(": ");
         fgets(userInput, MAX_LENGTH, stdin);
-
+        fflush(stdin);
+        fflush(stdout);  
         // if comment or blank line ignore all input
         if (userInput[0] != '#' && strcmp(userInput,"\n") != 0) {
             char expandedInput[MAX_LENGTH];
             expandInput(userInput, expandedInput);
-            printf("%s", expandedInput);
-            struct command input = parseInput(userInput);
+            // printf("expanded: %s", expandedInput);
+            struct command *input = parseInput(userInput);
             processInput(input);
             // struct argument *args = input.arguments;
             fflush(stdin);
