@@ -34,6 +34,14 @@ void checkInputEnding(char userInput[]) {
     }
 }
 
+void freeList(struct argument *head) {
+    while (head != NULL) {
+        struct argument *tmp = head;
+        head = head->nextargument;
+        free(tmp);
+    }
+}
+
 struct command *parseInput(char *userInput) {
     struct command *cmd = malloc(sizeof(struct command));
     cmd->command = NULL;
@@ -77,6 +85,7 @@ struct command *parseInput(char *userInput) {
             } else if (strcmp("&", token) == 0){
                 // process run in background 
                 printf("ampersand!");
+                fflush(stdout);
                 cmd->background = true;
             } else {
                 // process argument 
@@ -110,9 +119,10 @@ void expandInput(char input[], char newInput[]) {
 
     char *pidStr = (char *)(malloc(sizeof(pid_t)));
     sprintf(pidStr, "%d", pid);
-
+   
     bool firstSymbol = false;
     
+    int j = 0;
     // loop through old input look for $
     for (int i = 0; i < strlen(input); i++) {
         // found $
@@ -120,6 +130,7 @@ void expandInput(char input[], char newInput[]) {
             // check if second $ and if so expand 
             if (firstSymbol) {
                 strcat(newInput, pidStr);
+                 j += strlen(pidStr);
                 firstSymbol = false;
             // first $
             } else {
@@ -130,13 +141,16 @@ void expandInput(char input[], char newInput[]) {
             // reset search param for $
             if (firstSymbol) {
                 firstSymbol = false;
-                strcat(newInput, "$");
+                newInput[j] = '$';
+                newInput[j + 1] = input[i];
+                j++;
+            } else {
+               newInput[j] = input[i]; 
             }
-            // add input to newinput 
-            char toCat[2] = { input[i], '\0' };
-            strcat(newInput, toCat);
+            j++;
         }
     }
+    free(pidStr);
 }
 
 void processInput(struct command *input) {
@@ -159,6 +173,7 @@ void processInput(struct command *input) {
             int changePath = chdir(home);
             if (changePath == -1) {
                 perror("An error occurred changing paths");
+                fflush(stdout);
             }
         // change PWD to argument given
         } else {
@@ -167,12 +182,14 @@ void processInput(struct command *input) {
             int changePath = chdir(newPath);
             if (changePath == -1) {
                 perror("Unable to change to that directory");
+                fflush(stdout);
             }
         }
 
     } else if (strcmp(input->command, "status") == 0) {
         // get status  
         printf("Will print status\n");
+        fflush(stdout);
     } else {
         // for a new process 
         // adpated from exploration: process api: executing a new program 
@@ -193,7 +210,6 @@ void processInput(struct command *input) {
 
                 while (curr != NULL) {
                     args[counter] = curr->argument;
-                    printf("arg: %s", curr->argument);
                     counter++;
                     curr = curr->nextargument;
                 }
@@ -204,6 +220,7 @@ void processInput(struct command *input) {
 
                 if (status == -1) {
                     perror("A problem occurred executing\n");
+                    fflush(stdout);
                 }
                 exit(0);
                 break;
@@ -217,20 +234,25 @@ void processInput(struct command *input) {
 
 int main(void) {
     while (1) {
-        fflush(stdin);
         fflush(stdout);  
         char userInput[MAX_LENGTH];
         printf(": ");
+        fflush(stdout); 
         fgets(userInput, MAX_LENGTH, stdin);
+        fflush(stdin);
         // if comment or blank line ignore all input
         if (userInput[0] != '#' && strcmp(userInput,"\n") != 0) {
-            char expandedInput[MAX_LENGTH];
-            //expandInput(userInput, expandedInput);
-            struct command *input = parseInput(userInput);
+            char *expandedInput = calloc(strlen(userInput), strlen(userInput) * sizeof(char));
+            expandInput(userInput, expandedInput);
+            struct command *input = parseInput(expandedInput);
             processInput(input);
             // struct argument *args = input.arguments;
             fflush(stdin);
-            fflush(stdout);   
+            fflush(stdout); 
+
+            // free memory used 
+            freeList(input->arguments);
+            free(input);  
         }
     }
     return 0;
