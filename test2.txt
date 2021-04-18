@@ -1,0 +1,8 @@
+total 336
+drwxrwx---. 3 cunnicor upg14308   127 Apr 18 15:41 .
+drwxrwx---. 5 cunnicor upg14308    83 Apr 13 04:21 ..
+drwxrwx---. 8 cunnicor upg14308   270 Apr 18 15:41 .git
+-rwxrwx---. 1 cunnicor upg14308 18344 Apr 18 15:40 smallsh
+-rw-rw----. 1 cunnicor upg14308  8491 Apr 18 15:40 smallsh.c
+-rw-r-----. 1 cunnicor upg14308     0 Apr 18 15:41 test2.txt
+-rw-r-----. 1 cunnicor upg14308    27 Apr 18 15:40 test.txt

@@ -153,6 +153,31 @@ void expandInput(char input[], char newInput[]) {
     free(pidStr);
 }
 
+void redirectInput(char inputFile[]) {
+    // redirects stdin to be file given 
+    int file = open(inputFile, O_RDONLY);
+    if (file == -1) {
+        perror("File not found");
+    } else {
+        int redirect = dup2(file, 0);
+        if (redirect == -1) {
+            perror("Error redirecting stdin to file");
+        }
+    }
+}
+
+void redirectOutput(char outputFile[]) {
+    // redirects stdout to be file given 
+    int file = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (file == -1) {
+        perror("Error opening/creating file");
+    } else {
+        int redirect = dup2(file, 1);
+        if (redirect == -1) {
+            perror("Error redirecting to file");
+        }
+    }
+}
 void processInput(struct command *input) {
     // looks at the command in the struct given and executes 
     // built in function OR uses exec to execute non built in 
@@ -218,12 +243,12 @@ void processInput(struct command *input) {
                 
                 // redirect stdout if file given
                 if (input->outputFile != NULL) {
-                    printf("output file changed\n");
+                    redirectOutput(input->outputFile);
                 }
 
                 // redirect stdin if file given 
                 if (input->inputFile != NULL) {
-                    printf("input file given\n");
+                    redirectInput(input->inputFile);
                 }
                 
                 int status = execvp(args[0], args);

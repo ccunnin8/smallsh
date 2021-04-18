@@ -1,0 +1,3 @@
+smallsh
+smallsh.c
+test.txt
