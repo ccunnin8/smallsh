@@ -70,23 +70,23 @@ struct command *parseInput(char *userInput) {
     cmd->command = token;
 
     while (token = strtok_r(NULL, " ", &saveptr)) {
-        if (argumentCount == 1) {
-            arg->argument = token;
-            argumentCount++;
+      if (strcmp("<", token) == 0) {
+            // process stdin redirect 
+            char *fileName = strtok_r(NULL, " ", &saveptr);
+            cmd->inputFile = fileName;
+       } else if (strcmp(">", token) == 0) {
+            // process stdout redirect 
+            char *fileName = strtok_r(NULL, " ", &saveptr);
+            cmd->outputFile = fileName;
+        } else if (strcmp("&", token) == 0){
+            // process run in background 
+            printf("ampersand!");
+            fflush(stdout);
+            cmd->background = true;
         } else {
-            if (strcmp("<", token) == 0) {
-                // process stdin redirect 
-                char *fileName = strtok_r(NULL, " ", &saveptr);
-                cmd->inputFile = fileName;
-            } else if (strcmp(">", token) == 0) {
-                // process stdout redirect 
-                char *fileName = strtok_r(NULL, " ", &saveptr);
-                cmd->outputFile = fileName;
-            } else if (strcmp("&", token) == 0){
-                // process run in background 
-                printf("ampersand!");
-                fflush(stdout);
-                cmd->background = true;
+            if (argumentCount == 1) {
+                arg->argument = token;
+                argumentCount++;
             } else {
                 // process argument 
                 struct argument *newarg = malloc(sizeof(struct argument));
@@ -96,7 +96,7 @@ struct command *parseInput(char *userInput) {
                 argPtr->nextargument = newarg;
                 argPtr = newarg;
                 argumentCount++;
-            }
+             }
         }
     }
     // add number of arguments to the command struct if there are arguments 
@@ -216,12 +216,23 @@ void processInput(struct command *input) {
 
                 args[counter] = NULL;
                 
+                // redirect stdout if file given
+                if (input->outputFile != NULL) {
+                    printf("output file changed\n");
+                }
+
+                // redirect stdin if file given 
+                if (input->inputFile != NULL) {
+                    printf("input file given\n");
+                }
+                
                 int status = execvp(args[0], args);
 
                 if (status == -1) {
                     perror("A problem occurred executing\n");
                     fflush(stdout);
                 }
+
                 exit(0);
                 break;
             default:
@@ -253,6 +264,7 @@ int main(void) {
             // free memory used 
             freeList(input->arguments);
             free(input);  
+            free(expandedInput);
         }
     }
     return 0;
