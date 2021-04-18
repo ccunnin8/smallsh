@@ -178,9 +178,10 @@ void redirectOutput(char outputFile[]) {
         }
     }
 }
-void processInput(struct command *input) {
+void processInput(struct command *input, int *currentStatus) {
     // looks at the command in the struct given and executes 
     // built in function OR uses exec to execute non built in 
+
     if (strcmp(input->command, "exit") == 0) {
         // exit 
         // get group process id and kill all children 
@@ -198,7 +199,6 @@ void processInput(struct command *input) {
             int changePath = chdir(home);
             if (changePath == -1) {
                 perror("An error occurred changing paths");
-                fflush(stdout);
             }
         // change PWD to argument given
         } else {
@@ -207,21 +207,19 @@ void processInput(struct command *input) {
             int changePath = chdir(newPath);
             if (changePath == -1) {
                 perror("Unable to change to that directory");
-                fflush(stdout);
             }
         }
 
     } else if (strcmp(input->command, "status") == 0) {
         // get status  
-        printf("Will print status\n");
+        printf("exit value %d\n", *currentStatus);
         fflush(stdout);
     } else {
         // for a new process 
         // adpated from exploration: process api: executing a new program 
         pid_t spawnPid = fork();
-        int childStatus;
         char *args[input->numArguments + 1];
-
+        int childStatus;
         switch (spawnPid) {
             case -1:
                 perror("fork error\n");
@@ -254,21 +252,21 @@ void processInput(struct command *input) {
                 int status = execvp(args[0], args);
 
                 if (status == -1) {
-                    perror("A problem occurred executing\n");
-                    fflush(stdout);
+                    perror("A problem occurred executing");
+                    exit(1);
                 }
 
                 exit(0);
                 break;
             default:
                 spawnPid = waitpid(spawnPid, &childStatus, 0);
-
-
+                *currentStatus = WEXITSTATUS(childStatus);
         }
     }
 }
 
 int main(void) {
+    int status = 0;
     while (1) {
         fflush(stdout);  
         char userInput[MAX_LENGTH];
@@ -281,7 +279,7 @@ int main(void) {
             char *expandedInput = calloc(strlen(userInput), strlen(userInput) * sizeof(char));
             expandInput(userInput, expandedInput);
             struct command *input = parseInput(expandedInput);
-            processInput(input);
+            processInput(input, &status);
             // struct argument *args = input.arguments;
             fflush(stdin);
             fflush(stdout); 
