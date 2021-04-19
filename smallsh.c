@@ -10,6 +10,41 @@
 
 #define MAX_LENGTH 2048
 
+pid_t *createPidArray() {
+    pid_t *array = calloc(5, sizeof(pid_t) * 5);    
+}
+
+void insertIntoArray(pid_t *arr, pid_t val, int len) {
+    
+    int index = 0;
+    while (arr[index] != NULL) {
+        index++;
+    }
+    if (index > len / 2) {
+        int newLen = len * 2;
+        pid_t *newArray = calloc(newLen, sizeof(pid_t) * newLen);
+        for (int i = 0; i < len; i++) {
+            newArray[i] = arr[i];
+        }
+        arr = newArray;
+    }
+    arr[index + 1] = val;
+}
+
+void removeFromArray(pid_t *arr, pid_t val, int len) {
+    int index = 0;
+    while (arr[index] != val && index < len) index++; 
+    if (arr[index] == val) {
+        arr[index] = 0;
+        if (index < len - 2) {
+            while (index < len) {
+                arr[index] = arr[index + 1];
+                index++;
+            }
+        }
+    }
+}
+
 struct command {
     char *command;
     struct argument *arguments;
