@@ -80,8 +80,6 @@ struct command *parseInput(char *userInput) {
             cmd->outputFile = fileName;
         } else if (strcmp("&", token) == 0){
             // process run in background 
-            printf("ampersand!");
-            fflush(stdout);
             cmd->background = true;
         } else {
             if (argumentCount == 1) {
@@ -158,10 +156,12 @@ void redirectInput(char inputFile[]) {
     int file = open(inputFile, O_RDONLY);
     if (file == -1) {
         perror("File not found");
+        exit(1);
     } else {
         int redirect = dup2(file, 0);
         if (redirect == -1) {
             perror("Error redirecting stdin to file");
+            exit(1);
         }
     }
 }
@@ -171,10 +171,12 @@ void redirectOutput(char outputFile[]) {
     int file = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (file == -1) {
         perror("Error opening/creating file");
+        exit(1);
     } else {
         int redirect = dup2(file, 1);
         if (redirect == -1) {
             perror("Error redirecting to file");
+            exit(1);
         }
     }
 }
@@ -212,7 +214,7 @@ void processInput(struct command *input, int *currentStatus) {
 
     } else if (strcmp(input->command, "status") == 0) {
         // get status  
-        printf("exit value %d\n", *currentStatus);
+        printf("exit value %d", *currentStatus);
         fflush(stdout);
     } else {
         // for a new process 
@@ -259,7 +261,11 @@ void processInput(struct command *input, int *currentStatus) {
                 exit(0);
                 break;
             default:
-                spawnPid = waitpid(spawnPid, &childStatus, 0);
+                if (input->background) {
+                    printf("background pid is %d\n", spawnPid);
+                }
+                spawnPid = waitpid(spawnPid, &childStatus, input->background ? WNOHANG : 0);
+               
                 *currentStatus = WEXITSTATUS(childStatus);
         }
     }
