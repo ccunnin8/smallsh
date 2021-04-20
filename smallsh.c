@@ -11,30 +11,38 @@
 #define MAX_LENGTH 2048
 
 // ******* RESIZEABLE ARRAY OF PID_T ************ /// 
-pid_t *createPidArray() {
-    pid_t *array = calloc(5, sizeof(pid_t) * 5);  
-    return array;  
+
+
+void printArr(pid_t arr[]) {
+    printf("PRINTING: \n");
+    int i = 0;
+    while (arr[i] != 0) {
+        printf("val %d index %d\n", arr[i], i);
+        i++;
+    }
 }
 
-int getLengthArray(pid_t *arr) {
-  int index = 0;
-  while (arr[index] != 0) index++;
-  return index;
+pid_t *createPidArray(int arrSize) {
+    return calloc(arrSize, sizeof(pid_t) * arrSize);  
 }
 
-void insertIntoArray(pid_t *arr, pid_t val, int len) {
+
+void insertIntoArray(pid_t *arr, pid_t val, int *len) {
     
     int index = 0;
     while (arr[index] != 0) {
         index++;
     }
-    if (index > len / 2) {
-        int newLen = len * 2;
+    if (index >= *len / 2) {
+        // get new length, reassign len to val of newLen allocate new array of size newLen
+        int newLen = *len * 2;
+        *len = newLen;
         pid_t *newArray = calloc(newLen, sizeof(pid_t) * newLen);
-        for (int i = 0; i < len; i++) {
+
+        for (int i = 0; i < newLen; i++) {
             newArray[i] = arr[i];
         }
-        arr = newArray;
+        *arr = *newArray;
     }
     arr[index] = val;
 }
@@ -44,14 +52,16 @@ void removeFromArray(pid_t *arr, pid_t val, int len) {
     while (arr[index] != val && index < len) index++; 
     if (arr[index] == val) {
         arr[index] = 0;
-        if (index < len - 2) {
+        if (index < len - 1) {
             while (index < len) {
                 arr[index] = arr[index + 1];
                 index++;
             }
+            arr[index] = 0;
         }
     }
 }
+
 // *****************************************************
 
 // ********** COMMAND and ARG STRUCT ***************************
@@ -227,7 +237,7 @@ void redirectOutput(char outputFile[]) {
         }
     }
 }
-void processInput(struct command *input, int *currentStatus, pid_t *bgPids) {
+void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int *bgPidsSize) {
     // looks at the command in the struct given and executes 
     // built in function OR uses exec to execute non built in 
 
@@ -311,7 +321,7 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids) {
                 // if in background add to bgPids list 
                 if (input->background) {
                     printf("background pid is %d\n", spawnPid);
-                    insertIntoArray(bgPids, spawnPid, getLengthArray(bgPids));
+                    insertIntoArray(bgPids, spawnPid, bgPidsSize);
                 }
 
                 spawnPid = waitpid(spawnPid, &childStatus, input->background ? WNOHANG : 0);
@@ -323,7 +333,9 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids) {
 
 int main(void) {
     int status = 0;
-    pid_t *bgPids = createPidArray();
+    int bgPidsSize = 5;
+    pid_t *bgPids = createPidArray(bgPidsSize);
+    
 
     while (1) {
         fflush(stdout);  
@@ -337,7 +349,7 @@ int main(void) {
                     if (bgPid != 0) {
                         if (WIFEXITED(bgStatus)) {
                             printf("background pid %d is done: exit value: %d\n", bgPids[index], WEXITSTATUS(bgStatus));
-                            removeFromArray(bgPids, bgPids[index], getLengthArray(bgPids));
+                            removeFromArray(bgPids, bgPids[index], bgPidsSize);
                         }
                     }
                     index++;
@@ -351,7 +363,7 @@ int main(void) {
             char *expandedInput = calloc(strlen(userInput), strlen(userInput) * sizeof(char));
             expandInput(userInput, expandedInput);
             struct command *input = parseInput(expandedInput);
-            processInput(input, &status, bgPids);
+            processInput(input, &status, bgPids, &bgPidsSize);
             // struct argument *args = input.arguments;
             fflush(stdin);
             fflush(stdout); 
