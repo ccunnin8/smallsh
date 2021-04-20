@@ -349,8 +349,11 @@ int main(void) {
                     if (bgPid != 0) {
                         if (WIFEXITED(bgStatus)) {
                             printf("background pid %d is done: exit value: %d\n", bgPids[index], WEXITSTATUS(bgStatus));
-                            removeFromArray(bgPids, bgPids[index], bgPidsSize);
                         }
+                        if (WIFSIGNALED(bgStatus)) {
+                            printf("background pid %d is done: terminated by signal %d\n", bgPids[index], WTERMSIG(bgStatus));
+                        }
+                        removeFromArray(bgPids, bgPids[index], bgPidsSize);
                     }
                     index++;
                 }
