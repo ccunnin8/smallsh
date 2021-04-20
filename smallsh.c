@@ -10,8 +10,8 @@
 
 #define MAX_LENGTH 2048
 
+bool allowBg;
 // ******* RESIZEABLE ARRAY OF PID_T ************ /// 
-
 
 void printArr(pid_t arr[]) {
     printf("PRINTING: \n");
@@ -279,12 +279,14 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
         pid_t spawnPid = fork();
         char *args[input->numArguments + 1];
         int childStatus;
+    
         switch (spawnPid) {
             case -1:
                 perror("fork error\n");
                 exit(1);
                 break;
             case 0:
+
                 // use exec family 
                 args[0] = input->command;
                 struct argument *curr = input->arguments;
@@ -310,6 +312,11 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
                 
                 int status = execvp(args[0], args);
 
+                // ignore CTRL-Z 
+                struct sigaction ignore_action = { 0 };
+                ignore_action.sa_handler = SIG_IGN;
+                sigaction(SIGTSTP, &ignore_action, NULL);
+                
                 if (status == -1) {
                     perror("A problem occurred executing");
                     exit(1);
@@ -319,37 +326,65 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
                 break;
             default:
                 // if in background add to bgPids list 
-                if (input->background) {
+                if (input->background && allowBg) {
                     printf("background pid is %d\n", spawnPid);
                     insertIntoArray(bgPids, spawnPid, bgPidsSize);
                 }
 
-                spawnPid = waitpid(spawnPid, &childStatus, input->background ? WNOHANG : 0);
+
+                spawnPid = waitpid(spawnPid, &childStatus, input->background && allowBg ? WNOHANG : 0);
                
                 *currentStatus = WEXITSTATUS(childStatus);
         }
     }
 }
 
+void handleTSTP() {
+    if (!allowBg) {
+        char *msg = "Entering foreground-only mode (& is ignored)\n";
+        write(STDOUT_FILENO, msg, 46);
+    } else {
+        char *msg = "Exiting foreground-only mode\n";
+        write(STDOUT_FILENO, msg, 30);
+    }
+    allowBg = !allowBg;
+    char *newLine = ": ";
+    write(STDOUT_FILENO, newLine, 3);
+}
+
 int main(void) {
+    printf("TEST: allowbg = %d", allowBg);
     int status = 0;
     int bgPidsSize = 5;
+    allowBg = true;
     pid_t *bgPids = createPidArray(bgPidsSize);
+    //ignore CTR-C 
+    struct sigaction ignore_action = { 0 }, handle_tstp = { 0 };
+    ignore_action.sa_handler = SIG_IGN;
+    sigaction(SIGINT, &ignore_action, NULL);
+
+    // handle TSTP
     
+    handle_tstp.sa_handler = &handleTSTP;
+    handle_tstp.sa_flags = SA_RESTART;
+    sigaction(SIGTSTP, &handle_tstp, NULL);
 
     while (1) {
         fflush(stdout);  
         char userInput[MAX_LENGTH];
 
-        // loop through bgPids, if exited print msg and remove from bgPids
+                // loop through bgPids, if exited print msg and remove from bgPids
                 int index = 0;
                 while (bgPids[index] != 0) {
                     int bgStatus;
                     pid_t bgPid = waitpid(bgPids[index], &bgStatus, WNOHANG);
+                    // if bgPid is non zero than it has finished  
                     if (bgPid != 0) {
+                        // check if exited 
                         if (WIFEXITED(bgStatus)) {
                             printf("background pid %d is done: exit value: %d\n", bgPids[index], WEXITSTATUS(bgStatus));
                         }
+                        // check if signaled 
                         if (WIFSIGNALED(bgStatus)) {
                             printf("background pid %d is done: terminated by signal %d\n", bgPids[index], WTERMSIG(bgStatus));
                         }
