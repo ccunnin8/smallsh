@@ -11,6 +11,7 @@
 #define MAX_LENGTH 2048
 
 bool allowBg;
+bool wasKill;
 // ******* RESIZEABLE ARRAY OF PID_T ************ /// 
 
 void printArr(pid_t arr[]) {
@@ -240,6 +241,9 @@ void redirectOutput(char outputFile[]) {
 void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int *bgPidsSize) {
     // looks at the command in the struct given and executes 
     // built in function OR uses exec to execute non built in 
+     if (strcmp(input->command, "kill") == 0) {
+        wasKill = true;
+    }
 
     if (strcmp(input->command, "exit") == 0) {
         // exit 
@@ -271,7 +275,7 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
 
     } else if (strcmp(input->command, "status") == 0) {
         // get status  
-        printf("exit value %d", *currentStatus);
+        printf("exit value %d\n", *currentStatus);
         fflush(stdout);
     } else {
         // for a new process 
@@ -289,6 +293,7 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
 
                 // use exec family 
                 args[0] = input->command;
+                
                 struct argument *curr = input->arguments;
                 int counter = 1;
 
@@ -340,16 +345,26 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
 }
 
 void handleTSTP() {
-    if (allowBg) {
-        char *msg = "Entering foreground-only mode (& is ignored)\n";
-        write(STDOUT_FILENO, msg, 46);
+    if (wasKill) {
+        if (allowBg) {
+            char *msg = "Entering foreground-only mode (& is ignored)\n";
+            write(STDOUT_FILENO, msg, 46);
+        } else {
+            char *msg = "Exiting foreground-only mode\n";
+            write(STDOUT_FILENO, msg, 30);
+        }
     } else {
-        char *msg = "Exiting foreground-only mode\n";
-        write(STDOUT_FILENO, msg, 30);
-    }
+        if (allowBg) {
+            char *msg = "\nEntering foreground-only mode (& is ignored)\n";
+            write(STDOUT_FILENO, msg, 47);
+        } else {
+            char *msg = "\nExiting foreground-only mode\n";
+            write(STDOUT_FILENO, msg, 31);
+        }
+            char *newLine = ": ";
+            write(STDOUT_FILENO, newLine, 3);
+        }
     allowBg = !allowBg;
-    char *newLine = ": ";
-    write(STDOUT_FILENO, newLine, 3);
 }
 
 int main(void) {
@@ -369,7 +384,9 @@ int main(void) {
     sigaction(SIGTSTP, &handle_tstp, NULL);
 
     while (1) {
-        fflush(stdout);  
+        wasKill = false;
+        fflush(stdout); 
+        fflush(stdin); 
         char userInput[MAX_LENGTH];
 
                 // loop through bgPids, if exited print msg and remove from bgPids
@@ -392,7 +409,7 @@ int main(void) {
                     index++;
                 }
         printf(": ");
-        fflush(stdout); 
+        fflush(stdout);
         fgets(userInput, MAX_LENGTH, stdin);
         fflush(stdin);
         // if comment or blank line ignore all input
@@ -401,10 +418,7 @@ int main(void) {
             expandInput(userInput, expandedInput);
             struct command *input = parseInput(expandedInput);
             processInput(input, &status, bgPids, &bgPidsSize);
-            // struct argument *args = input.arguments;
-            fflush(stdin);
-            fflush(stdout); 
-
+            
             // free memory used 
             freeList(input->arguments);
             free(input);  
