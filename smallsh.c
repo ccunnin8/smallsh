@@ -340,7 +340,7 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
 }
 
 void handleTSTP() {
-    if (!allowBg) {
+    if (allowBg) {
         char *msg = "Entering foreground-only mode (& is ignored)\n";
         write(STDOUT_FILENO, msg, 46);
     } else {
@@ -353,7 +353,6 @@ void handleTSTP() {
 }
 
 int main(void) {
-    printf("TEST: allowbg = %d", allowBg);
     int status = 0;
     int bgPidsSize = 5;
     allowBg = true;
