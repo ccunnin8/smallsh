@@ -1,3 +1,11 @@
+
+/**
+ * Author: Corey Cunningham
+ * Date: 04-26-2021
+ * Class: CS 344
+ * Assignment: smallsh portfolio project 
+ **/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -15,6 +23,7 @@ bool wasKill;
 // ******* RESIZEABLE ARRAY OF PID_T ************ /// 
 
 void printArr(pid_t arr[]) {
+    // print values in array (used for debugging)
     printf("PRINTING: \n");
     int i = 0;
     while (arr[i] != 0) {
@@ -24,12 +33,14 @@ void printArr(pid_t arr[]) {
 }
 
 pid_t *createPidArray(int arrSize) {
+    // create a pid_t array of size arrSize 
     return calloc(arrSize, sizeof(pid_t) * arrSize);  
 }
 
 
 void insertIntoArray(pid_t *arr, pid_t val, int *len) {
-    
+    // insert pid_t into array 
+
     int index = 0;
     while (arr[index] != 0) {
         index++;
@@ -49,6 +60,8 @@ void insertIntoArray(pid_t *arr, pid_t val, int *len) {
 }
 
 void removeFromArray(pid_t *arr, pid_t val, int len) {
+    // remove pid_t from array 
+
     int index = 0;
     while (arr[index] != val && index < len) index++; 
     if (arr[index] == val) {
@@ -93,6 +106,7 @@ void checkInputEnding(char userInput[]) {
 }
 
 void freeList(struct argument *head) {
+    // free all values in linked list 
     while (head != NULL) {
         struct argument *tmp = head;
         head = head->nextargument;
@@ -101,6 +115,8 @@ void freeList(struct argument *head) {
 }
 
 struct command *parseInput(char *userInput) {
+    // parse command line input into command struct 
+
     struct command *cmd = malloc(sizeof(struct command));
     cmd->command = NULL;
     cmd->arguments = NULL;
@@ -213,7 +229,8 @@ void redirectInput(char inputFile[]) {
     // redirects stdin to be file given 
     int file = open(inputFile, O_RDONLY);
     if (file == -1) {
-        perror("File not found");
+        printf("cannot open %s for input\n", inputFile);
+        fflush(stdout);
         exit(1);
     } else {
         int redirect = dup2(file, 0);
@@ -238,6 +255,8 @@ void redirectOutput(char outputFile[]) {
         }
     }
 }
+
+
 void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int *bgPidsSize) {
     // looks at the command in the struct given and executes 
     // built in function OR uses exec to execute non built in 
@@ -275,7 +294,11 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
 
     } else if (strcmp(input->command, "status") == 0) {
         // get status  
-        printf("exit value %d\n", *currentStatus);
+        if (*currentStatus == 0 || *currentStatus == 1) {
+            printf("exit value %d\n", *currentStatus);
+        } else {
+            printf("terminated by signal %d\n", *currentStatus);
+        }
         fflush(stdout);
     } else {
         // for a new process 
@@ -289,7 +312,22 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
                 perror("fork error\n");
                 exit(1);
                 break;
-            case 0:
+            case 0: ;
+                // SIGNAL HANDLERS 
+                
+                // ignore CTRL-Z 
+                struct sigaction ignore_action = { 0 };
+                ignore_action.sa_handler = SIG_IGN;
+                ignore_action.sa_flags = 0;
+                sigaction(SIGTSTP, &ignore_action, NULL);
+                
+                // catch CTRL-C if foreground 
+                if (!(input->background && allowBg)) {
+                    struct sigaction sigint_action = { 0 };
+                    sigint_action.sa_handler = SIG_DFL;
+                    sigint_action.sa_flags = 0;
+                    sigaction(SIGINT, &sigint_action, NULL);
+                }
 
                 // use exec family 
                 args[0] = input->command;
@@ -317,13 +355,9 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
                 
                 int status = execvp(args[0], args);
 
-                // ignore CTRL-Z 
-                struct sigaction ignore_action = { 0 };
-                ignore_action.sa_handler = SIG_IGN;
-                sigaction(SIGTSTP, &ignore_action, NULL);
-                
+
                 if (status == -1) {
-                    perror("A problem occurred executing");
+                    perror(input->command);
                     exit(1);
                 }
 
@@ -338,11 +372,16 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
 
 
                 spawnPid = waitpid(spawnPid, &childStatus, input->background && allowBg ? WNOHANG : 0);
-               
-                *currentStatus = WEXITSTATUS(childStatus);
+                if (WIFSIGNALED(childStatus)) {
+                    printf("terminated by signal %d\n", WTERMSIG(childStatus));
+                    *currentStatus = WTERMSIG(childStatus);
+                } else {
+                    *currentStatus = WEXITSTATUS(childStatus);
+                }
         }
     }
 }
+
 
 void handleTSTP() {
     if (wasKill) {
