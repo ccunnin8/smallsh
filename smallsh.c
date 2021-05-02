@@ -131,8 +131,8 @@ struct command *parseInput(char *userInput) {
     struct argument *argPtr = arg; 
 
     // store arguments to parse 
-    char arguments[MAX_LENGTH] = { 0 };
     int argumentCount = 1;
+    int indexOfAmp = -1;
 
     // remove new line from userInput 
     checkInputEnding(userInput);
@@ -143,7 +143,7 @@ struct command *parseInput(char *userInput) {
     
     cmd->command = token;
 
-    while (token = strtok_r(NULL, " ", &saveptr)) {
+    while ((token = strtok_r(NULL, " ", &saveptr))) {
       if (strcmp("<", token) == 0) {
             // process stdin redirect 
             char *fileName = strtok_r(NULL, " ", &saveptr);
@@ -154,7 +154,7 @@ struct command *parseInput(char *userInput) {
             cmd->outputFile = fileName;
         } else if (strcmp("&", token) == 0){
             // process run in background 
-            cmd->background = true;
+            indexOfAmp = argumentCount;
         } else {
             if (argumentCount == 1) {
                 arg->argument = token;
@@ -170,6 +170,9 @@ struct command *parseInput(char *userInput) {
                 argumentCount++;
              }
         }
+    }
+    if (indexOfAmp == argumentCount) {
+        cmd->background = true;
     }
     // add number of arguments to the command struct if there are arguments 
     if (arg->argument != NULL) {
@@ -316,14 +319,14 @@ void processInput(struct command *input, int *currentStatus, pid_t *bgPids, int 
                 // SIGNAL HANDLERS 
                 
                 // ignore CTRL-Z 
-                struct sigaction ignore_action = { 0 };
+                struct sigaction ignore_action = {{ 0 }};
                 ignore_action.sa_handler = SIG_IGN;
                 ignore_action.sa_flags = 0;
                 sigaction(SIGTSTP, &ignore_action, NULL);
                 
                 // catch CTRL-C if foreground 
                 if (!(input->background && allowBg)) {
-                    struct sigaction sigint_action = { 0 };
+                    struct sigaction sigint_action = {{ 0 }};
                     sigint_action.sa_handler = SIG_DFL;
                     sigint_action.sa_flags = 0;
                     sigaction(SIGINT, &sigint_action, NULL);
@@ -412,7 +415,7 @@ int main(void) {
     allowBg = true;
     pid_t *bgPids = createPidArray(bgPidsSize);
     //ignore CTR-C 
-    struct sigaction ignore_action = { 0 }, handle_tstp = { 0 };
+    struct sigaction ignore_action = {{ 0 }}, handle_tstp = {{ 0 }};
     ignore_action.sa_handler = SIG_IGN;
     sigaction(SIGINT, &ignore_action, NULL);
 
